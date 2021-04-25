@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+opencv-python = "==4.5.1.48"
+torch = "==1.8.1"
+tqdm = "==4.60.0"
+requests = "==2.25.1"
+torchvision = "==0.9.1"
+matplotlib = "==3.3.4"
+Flask = "==1.1.2"
+Pillow = "==8.2.0"
+
+[dev-packages]
+
+[requires]
+python_version = "3.6"
