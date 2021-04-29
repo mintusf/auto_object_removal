@@ -9,11 +9,12 @@ from utils.load import parse_config
 class Segmentor:
     def __init__(self, config_path: str):
 
+        # Parse config parameters
         self.config = parse_config(config_path)
         self.max_instances = self.config["max_instances"]
-
         self.semantic_segmentation_model_cfg = self.config["semantic_segmentation_cfg"]
 
+        # Set device
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         self._build_models()
@@ -44,9 +45,11 @@ class Segmentor:
         else:
             raise NotImplementedError("Only deeplab model is supported for now")
 
+        # Move model to a correct device and set to eval mode
         self.semseg_model = self.semseg_model.to(self.device)
         self.semseg_model.eval()
 
+        # Create classname-channel pairs of model's output
         self._parse_class_idx()
 
         # Normalization parameters
@@ -65,8 +68,9 @@ class Segmentor:
         return self._semseg_std
 
     def _parse_class_idx(self) -> None:
-        """Parses indices of corresponding classes in final prediction"""
-        # Semantic segmentation
+        """Parses indices (channels) of corresponding classes in final prediction"""
+        
+        # Parse for semantic segmentation
         self.semseg_class_list = self.config["semseg_idx"][
             self.semantic_segmentation_model_cfg[1]
         ]
@@ -112,6 +116,7 @@ class Segmentor:
 
         input_image = self._preprocess(input_image)
 
+        # Generate a tensor which indicates pixel-wise class
         with torch.no_grad():
             output = self.semseg_model(input_image)["out"][0]
         output_predictions = output.argmax(0)
