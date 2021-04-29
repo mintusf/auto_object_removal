@@ -1,3 +1,9 @@
 input_type: "image"
-segmentation_model: "mrcnn"
+semantic_segmentation_cfg: ["resnet50", "deeplab"]
 max_instances: 50
+
+# class indexes
+semseg_idx:
+  deeplab: ['__background__', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
+ 'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike',
+ 'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
