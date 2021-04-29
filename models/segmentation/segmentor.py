@@ -19,6 +19,7 @@ class Segmentor:
         self._build_models()
 
     def _build_models(self) -> None:
+        """Build semantic and instance (TODO) segmentation models as well preprocessing and postprocessing parameters"""
 
         ### SEMANTIC SEGMENTATION ###
         if self.semantic_segmentation_model_cfg[1] == "deeplab":
@@ -64,6 +65,7 @@ class Segmentor:
         return self._semseg_std
 
     def _parse_class_idx(self) -> None:
+        """Parses indices of corresponding classes in final prediction"""
         # Semantic segmentation
         self.semseg_class_list = self.config["semseg_idx"][
             self.semantic_segmentation_model_cfg[1]
@@ -78,6 +80,14 @@ class Segmentor:
         )
 
     def _preprocess(self, input_image: np.array) -> torch.tensor:
+        """Performs preprocessing of input image
+
+        Args:
+            input_image (np.array): Image to be used as model's input
+
+        Returns:
+            torch.tensor: Preprocessed image ready for inference
+        """
 
         transform = transforms.Compose(
             [
@@ -90,7 +100,15 @@ class Segmentor:
 
         return input_image.unsqueeze(0)
 
-    def get_mask_sem(self, input_image: np.array, class_name: str):
+    def predict_mask(self, input_image: np.array) -> np.array:
+        """Performs inference on the image
+
+        Args:
+            input_image (np.array): Input image
+
+        Returns:
+            np.array: Predictions of size (C, H, W)
+        """
 
         input_image = self._preprocess(input_image)
 
@@ -98,6 +116,25 @@ class Segmentor:
             output = self.semseg_model(input_image)["out"][0]
         output_predictions = output.argmax(0)
 
-        class_idx = self.semseg_class_dict[class_name]
+        return output_predictions.cpu().numpy()
 
-        return torch.where(output_predictions == class_idx, 255, 0).cpu().numpy()
+    def get_mask_sem(self, output_predictions: np.array, class_name: str) -> np.array:
+        """Using model's predictions, extract mask for a desired class
+
+        Args:
+            output_predictions (np.array): Model's predictions
+            class_name (str): Name of the class which mask is to be extracted
+
+        Returns:
+            np.array: Mask of desired class
+        """
+
+        # class name check
+        if class_name not in self.semseg_class_list:
+            raise ValueError(f"Class name {class_name} is not supported")
+
+        # Get mask of desired class
+        class_idx = self.semseg_class_dict[class_name]
+        class_mask = np.where(output_predictions == class_idx, 255, 0)
+
+        return class_mask
