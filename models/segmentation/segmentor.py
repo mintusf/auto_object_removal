@@ -2,6 +2,7 @@ import torch
 import torchvision
 from torchvision import transforms
 import numpy as np
+import cv2
 
 from utils.load import parse_config
 
@@ -13,6 +14,7 @@ class Segmentor:
         self.config = parse_config(config_path)
         self.max_instances = self.config["max_instances"]
         self.semantic_segmentation_model_cfg = self.config["semantic_segmentation_cfg"]
+        self.mask_dilation_size = self.config['mask_dilation_size']
 
         # Set device
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -141,5 +143,8 @@ class Segmentor:
         # Get mask of desired class
         class_idx = self.semseg_class_dict[class_name]
         class_mask = np.where(output_predictions == class_idx, 255, 0)
+
+        dilation_kernel = np.ones((self.mask_dilation_size,self.mask_dilation_size),np.uint8)
+        class_mask = cv2.dilate(class_mask.astype(np.uint8),dilation_kernel,iterations = 1)
 
         return class_mask
