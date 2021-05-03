@@ -9,13 +9,27 @@ from models.inpainting.abstract_inpainting_model import AbstractInpaintClass
 
 
 class CRFillModel(AbstractInpaintClass):
-    def __init__(self, config_path: str) -> None:
-        super().__init__(config_path)
-        self._build_model()
+    def __init__(self, config_path: str, pretrained=True) -> None:
+        """Initializes crfill inpainting model
 
-    def _build_model(self) -> None:
+        Args:
+            config_path (str): Path to the config file
+            pretrained (bool, optional): Whether pretrained weights should be loaded. Defaults to True.
+        """
+        super().__init__(config_path)
+        self._build_model(pretrained)
+
+    def _build_model(self, pretrained: bool) -> None:
+        """Builds crfill inpainting model
+
+        Args:
+            pretrained (bool): Whether pretrained weigths should be loaded
+        """
         self.model = InpaintGenerator()
-        self.model.load_state_dict(torch.load(self.config["crfill"]["weights_path"]))
+        if pretrained:
+            self.model.load_state_dict(
+                torch.load(self.config["crfill"]["weights_path"])
+            )
         self.model = self.model.to(self.device)
 
     def _preprocess(
@@ -94,7 +108,7 @@ class CRFillModel(AbstractInpaintClass):
         return inpaint_result
 
 
-# The code from this repo is used here: https://github.com/zengxianyu/crfill
+# The code from this repo is used below: https://github.com/zengxianyu/crfill
 class InpaintGenerator(nn.Module):
     def __init__(self, cnum=48):
         super(InpaintGenerator, self).__init__()
