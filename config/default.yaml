@@ -1,9 +1,15 @@
 input_type: "image"
 semantic_segmentation_cfg: ["resnet50", "deeplab"]
 max_instances: 50
+mask_dilation_size: 10
 
 # class indexes
 semseg_idx:
   deeplab: ['__background__', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
  'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike',
  'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
+
+
+# Inpainting
+crfill:
+  weights_path: 'weights/crfill/model_256.pth'

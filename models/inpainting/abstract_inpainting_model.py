@@ -10,6 +10,7 @@ from utils.load import parse_config
 class AbstractInpaintClass(metaclass=abc.ABCMeta):
     def __init__(self, config_path):
         self.config = parse_config(config_path)
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     @abc.abstractmethod
     def _build_model(self) -> None:
