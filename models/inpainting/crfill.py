@@ -1,60 +1,95 @@
 import torch
 import torch.nn as nn
+from torchvision import transforms
 import numpy as np
 import cv2
+from typing import Tuple
 
 from models.inpainting.abstract_inpainting_model import AbstractInpaintClass
 
 
 class CRFillModel(AbstractInpaintClass):
-    def __init__(self, config_path):
+    def __init__(self, config_path: str) -> None:
         super().__init__(config_path)
         self._build_model()
 
-    def _build_model(self):
+    def _build_model(self) -> None:
         self.model = InpaintGenerator()
         self.model.load_state_dict(torch.load(self.config["crfill"]["weights_path"]))
         self.model = self.model.to(self.device)
 
-    def _preprocess(self, img_orig, mask_orig):
+    def _preprocess(
+        self, img_orig: np.array, mask_orig: np.array
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Preprocess input image and mask to prepare for inference
+
+        Args:
+            img_orig (np.array): Input image
+            mask_orig (np.array): Input mask indicating area to inpaint
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Preprocesses image and mask
+        """
+
+        # Change vcolor format
         img = img_orig[:, :, ::-1].copy()
-        h_raw, w_raw, _ = img.shape
 
-        h_t, w_t = h_raw // 8 * 8, w_raw // 8 * 8
-        img = cv2.resize(img, (w_t, h_t))
+        # COnvert to torch.tensor
+        img = transforms.ToTensor()(img).unsqueeze(0)
+        mask = transforms.ToTensor()(mask_orig).unsqueeze(0)
 
-        img = torch.Tensor(img.transpose((2, 0, 1)))[None, ...] / 255.0
+        # Normalize
         img = (img - 0.5) / 0.5
 
-        mask = cv2.resize(mask_orig, (w_raw, h_raw))
-
-        mask = cv2.resize(mask, (w_t, h_t))
-        mask = (mask > 0)[..., None]
-        mask = torch.Tensor(mask.transpose((2, 0, 1)))[None, ...]
-
+        # Send to devide
         img = img.to(self.device)
         mask = mask.to(self.device)
 
         return img, mask
 
     def _inference(self, img: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        """Performs inpainting inference
+
+        Args:
+            img (torch.Tensor): Preprocessed image
+            mask (torch.Tensor): Preprocessed mask
+
+        Returns:
+            torch.Tensor: Model's output
+        """
         _, model_output = self.model(img * (1 - mask), mask)
         model_output = model_output * mask + img * (1 - mask)
         model_output = model_output * 0.5 + 0.5
 
         return model_output
 
-    def _postprocess(self, model_output, img_orig, mask_orig):
+    def _postprocess(
+        self, model_output: torch.Tensor, img_orig: np.array, mask_orig: np.array
+    ) -> np.array:
+        """Performs postprocessing to obtain inpainted results
+
+        Args:
+            model_output (torch.Tensor): Model's output
+            img_orig (np.array): Input image
+            mask_orig (np.array): Input mask indicating area to inpaint
+
+        Returns:
+            np.array: Inpainting results
+        """
 
         h_raw, w_raw, _ = img_orig.shape
+        img_orig = img_orig[:, :, ::-1]
         if len(mask_orig.shape) == 2:
             mask_orig = np.expand_dims(mask_orig, 2)
 
-        model_output = model_output.detach().cpu()[0].numpy()*255
-        model_output = model_output.transpose((1,2,0)).astype(np.uint8)
+        if mask_orig.dtype == np.uint8:
+            mask_orig = mask_orig / 255
+
+        model_output = model_output.detach().cpu()[0].numpy() * 255
+        model_output = model_output.transpose((1, 2, 0)).astype(np.uint8)
         model_output = cv2.resize(model_output, (w_raw, h_raw))
-        inpaint_result = model_output*mask_orig + img_orig*(1-mask_orig)
-        inpaint_result = inpaint_result[:,:,::-1]
+        inpaint_result = model_output * mask_orig + img_orig * (1 - mask_orig)
+        inpaint_result = inpaint_result[:, :, ::-1]
 
         return inpaint_result
 
