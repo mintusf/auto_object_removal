@@ -5,7 +5,7 @@ mask_dilation_size: 10
 
 # class indexes
 semseg_idx:
-  deeplab: ['__background__', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
+  deeplab: ['background', 'aeroplane', 'bicycle', 'bird', 'boat', 'bottle', 'bus',
  'car', 'cat', 'chair', 'cow', 'diningtable', 'dog', 'horse', 'motorbike',
  'person', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
 
