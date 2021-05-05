@@ -93,7 +93,7 @@ app.layout = html.Div(
 
 
 @app.callback(
-    [Output("image-dropdown", 'options')],
+    [Output("image-dropdown", 'options'), Output('image-dropdown', 'value'), Output('original-image','src')],
     [Input("upload-image", "filename"), Input("upload-image", "contents")],
 )
 def upload_image(uploaded_filenames, uploaded_file_contents):
@@ -103,26 +103,20 @@ def upload_image(uploaded_filenames, uploaded_file_contents):
     if uploaded_filenames is not None and uploaded_file_contents is not None:
         for name, data in zip(uploaded_filenames, uploaded_file_contents):
             save_file(name, data, UPLOAD_DIRECTORY)
-
-            # Generate semantic masks when uploaded
-            input_image = cv2.imread(os.path.join(UPLOAD_DIRECTORY, name))
-            sem_mask_results = segmentor.predict_mask(input_image)
-            image_name = os.path.splitext(name)[0]
-            np.save(os.path.join(SEM_MASKS_DIRECTORY, image_name+'_masks'), sem_mask_results)
-
-            # Save available classes to remove
-            available_classes = segmentor.get_available_masks(sem_mask_results)
-            update_dict_json(os.path.join(MISC_DIRECTORY,'available_classes.json'), name, available_classes)
+    else:
+        return [], 'None', ''
 
     files = uploaded_files(UPLOAD_DIRECTORY)
 
     drop_list = [{'label':file, 'value':file} for file in files]
 
-    return [drop_list]
+    selected_option = files[-1]
+
+    return drop_list, selected_option, os.path.join('/uploaded_images', selected_option)
 
 
 @app.callback(
-    [Output('class-dropdown', 'options'), Output('original-image','src')],
+    [Output('class-dropdown', 'options')],
     [Input('image-dropdown', 'value')])
 def select_image(selected_image):
     """ Generates mask options for a selected image
@@ -133,12 +127,29 @@ def select_image(selected_image):
     Returns:
         [type]: [description]
     """
-    print(selected_image)
+
+    if selected_image is None or selected_image == 'None':
+        return [[]]
+
+    # Check if masks were already generated and analyzed
     classes = get_classes_from_json(selected_image, os.path.join(MISC_DIRECTORY,'available_classes.json'))
+
+    if not classes:
+        # Generate semantic masks
+        input_image = cv2.imread(os.path.join(UPLOAD_DIRECTORY, selected_image))
+        sem_mask_results = segmentor.predict_mask(input_image)
+        image_name = os.path.splitext(selected_image)[0]
+        np.save(os.path.join(SEM_MASKS_DIRECTORY, image_name+'_masks'), sem_mask_results)
+
+        # Save available classes to remove
+        available_classes = segmentor.get_available_masks(sem_mask_results)
+        update_dict_json(os.path.join(MISC_DIRECTORY,'available_classes.json'), selected_image, available_classes)
+
+        classes = get_classes_from_json(selected_image, os.path.join(MISC_DIRECTORY,'available_classes.json'))
 
     drop_list = [{'label':class_name, 'value':class_name} for class_name in classes]
 
-    return drop_list, os.path.join('/uploaded_images', selected_image)
+    return [drop_list]
 
 
 @app.callback(
