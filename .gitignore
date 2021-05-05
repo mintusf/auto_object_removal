@@ -37,6 +37,7 @@ __pypackages__/
 *.png
 *.jpg
 !samples/images/*
+!samples/GUI/*
 
 # App files
 app_files
