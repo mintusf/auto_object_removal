@@ -19,9 +19,9 @@ def test_crfill_pipeline():
 
     model_output = segmentor.predict_mask(input_image)
 
-    mask_dog = segmentor.get_mask_sem(model_output, "dog")
-    mask_bicycle = segmentor.get_mask_sem(model_output, "bicycle")
-    mask_car = segmentor.get_mask_sem(model_output, "car")
+    mask_dog = segmentor.get_mask_sem(model_output, ["dog"])
+    mask_bicycle = segmentor.get_mask_sem(model_output, ["bicycle"])
+    mask_car = segmentor.get_mask_sem(model_output, ["car"])
 
     for i, mask in enumerate([mask_dog, mask_bicycle, mask_car]):
         inpainted_result = inpainter.inpaint(input_image, mask)
