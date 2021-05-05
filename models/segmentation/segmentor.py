@@ -17,6 +17,7 @@ class Segmentor:
         self.semantic_segmentation_model_cfg = self.config["semantic_segmentation_cfg"]
 
         self.background_class_threshold = self.config['background_class_threshold']
+        self.foreground_class_threshold = self.config['foreground_class_threshold']
         self.mask_dilation_size = self.config['mask_dilation_size']
         self.mask_opening_size = self.config['mask_opening_size']
 
@@ -136,10 +137,16 @@ class Segmentor:
         background_channel = self.semseg_class2channel_dict['background']
         background_mask_orig = mask[background_channel,:,:].copy()
 
-        # Calculate where background is higher than threshold (softmax is used)
+        # Apply softmax
         mask_exp = np.exp(mask)
         mask_normalized = mask_exp / mask_exp.sum(0)
-        background_mask_final = mask_normalized[background_channel,:,:] > self.background_class_threshold
+        
+        # Calculate where background is higher than threshold (softmax is used)
+        low_background_confidence = mask_normalized[background_channel,:,:] < self.background_class_threshold
+
+        # Calculate where any foreground class is higher than threshols
+        foreground_classes_only = np.delete(mask_normalized, background_channel, 0)
+        high_foreground_confidence = np.any(foreground_classes_only > self.foreground_class_threshold, axis=0)
 
         # Find class with highest probability (excluding background)
         mask_min = mask.min()
@@ -147,7 +154,7 @@ class Segmentor:
         output_predictions = mask.argmax(0)
 
         # Set final class
-        output_predictions = np.where(background_mask_final, background_channel, output_predictions)
+        output_predictions = np.where(low_background_confidence & high_foreground_confidence, output_predictions, background_channel)
 
         return output_predictions
 

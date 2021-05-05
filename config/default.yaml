@@ -1,9 +1,10 @@
 input_type: "image"
 semantic_segmentation_cfg: ["resnet50", "deeplab"]
 max_instances: 50
-mask_opening_size: 15
+mask_opening_size: 20
 mask_dilation_size: 10
-background_class_threshold: 0.6
+background_class_threshold: 0.66
+foreground_class_threshold: 0.33
 
 # class indexes
 semseg_idx:
