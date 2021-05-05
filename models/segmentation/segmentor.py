@@ -15,7 +15,10 @@ class Segmentor:
         self.config = parse_config(config_path)
         self.max_instances = self.config["max_instances"]
         self.semantic_segmentation_model_cfg = self.config["semantic_segmentation_cfg"]
+
+        self.background_class_threshold = self.config['background_class_threshold']
         self.mask_dilation_size = self.config['mask_dilation_size']
+        self.mask_opening_size = self.config['mask_opening_size']
 
         # Set device
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -125,6 +128,31 @@ class Segmentor:
 
         return input_image.unsqueeze(0)
 
+    def _mask2class(self, mask: torch.Tensor) -> np.array:
+
+        mask = mask.cpu().numpy()
+
+        # Get background channel
+        background_channel = self.semseg_class2channel_dict['background']
+        background_mask_orig = mask[background_channel,:,:].copy()
+
+        # Calculate where background is higher than threshold (softmax is used)
+        mask_exp = np.exp(mask)
+        mask_normalized = mask_exp / mask_exp.sum(0)
+        background_mask_final = mask_normalized[background_channel,:,:] > self.background_class_threshold
+
+        # Find class with highest probability (excluding background)
+        mask_min = mask.min()
+        mask[background_channel,:,:] = mask_min
+        output_predictions = mask.argmax(0)
+
+        # Set final class
+        output_predictions = np.where(background_mask_final, background_channel, output_predictions)
+
+        return output_predictions
+
+
+    
     def predict_mask(self, input_image: np.array) -> np.array:
         """Performs inference on the image
 
@@ -140,11 +168,12 @@ class Segmentor:
         # Generate a tensor which indicates pixel-wise class
         with torch.no_grad():
             output = self.semseg_model(input_image)["out"][0]
-        output_predictions = output.argmax(0)
+        
+        output_predictions = self._mask2class(output)
 
-        return output_predictions.cpu().numpy()
+        return output_predictions
 
-    def get_mask_sem(self, output_predictions: np.array, class_name: str) -> np.array:
+    def get_mask_sem(self, output_predictions: np.array, class_name: str, save_path='') -> np.array:
         """Using model's predictions, extract mask for a desired class
 
         Args:
@@ -161,9 +190,15 @@ class Segmentor:
 
         # Get mask of desired class
         class_idx = self.semseg_class2channel_dict[class_name]
-        class_mask = np.where(output_predictions == class_idx, 255, 0)
+        class_mask = np.where(output_predictions == class_idx, 255, 0).astype(np.uint8)
 
+        # Opening
+        opening_kernel = np.ones((self.mask_opening_size,self.mask_opening_size),np.uint8)
+        class_mask = cv2.dilate(class_mask,opening_kernel)
+        class_mask = cv2.erode(class_mask,opening_kernel)
+
+        # Dilation
         dilation_kernel = np.ones((self.mask_dilation_size,self.mask_dilation_size),np.uint8)
-        class_mask = cv2.dilate(class_mask.astype(np.uint8),dilation_kernel,iterations = 1)
+        class_mask = cv2.dilate(class_mask,dilation_kernel)
 
         return class_mask
