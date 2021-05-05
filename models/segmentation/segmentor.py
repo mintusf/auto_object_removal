@@ -138,7 +138,7 @@ class Segmentor:
         return input_image.unsqueeze(0)
 
     def _mask2class(self, mask: torch.Tensor) -> np.array:
-        """ Postprocess semantic model's output to assign class to each pixel
+        """Postprocess semantic model's output to assign class to each pixel
 
         Args:
             mask (torch.Tensor): Semantic segmentation model's output
@@ -201,24 +201,29 @@ class Segmentor:
 
         return output_predictions
 
-    def get_mask_sem(self, output_predictions: np.array, class_name: str) -> np.array:
+    def get_mask_sem(self, output_predictions: np.array, class_names: list) -> np.array:
         """Using model's predictions, extract mask for a desired class
 
         Args:
             output_predictions (np.array): Model's predictions
-            class_name (str): Name of the class which mask is to be extracted
+            class_names (list): List of names of classes which mask is to be extracted
 
         Returns:
             np.array: Mask of desired class
         """
 
         # class name check
-        if class_name not in self.semseg_class2channel_list:
-            raise ValueError(f"Class name {class_name} is not supported")
+        for class_name in class_names:
+            if class_name not in self.semseg_class2channel_list:
+                raise ValueError(f"Class name {class_name} is not supported")
 
-        # Get mask of desired class
-        class_idx = self.semseg_class2channel_dict[class_name]
-        class_mask = np.where(output_predictions == class_idx, 255, 0).astype(np.uint8)
+        # Get mask of desired classes
+        class_idx = [
+            self.semseg_class2channel_dict[class_name] for class_name in class_names
+        ]
+        class_mask = np.where(np.isin(output_predictions, class_idx), 255, 0).astype(
+            np.uint8
+        )
 
         # Opening
         opening_kernel = np.ones(

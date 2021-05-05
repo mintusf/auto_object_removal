@@ -56,13 +56,11 @@ def get_upload_url(path):
 
 app.layout = html.Div(
     [
-        html.H1("Auto Object removal"),
-        html.H3(f"Upload image"),
+        html.H1("Auto Object removal", style={"text-align": "center"}),
+        html.H3(f"Upload image", style={"text-align": "center"}),
         dcc.Upload(
             id="upload-image",
-            children=html.Div(
-                ["Drag and drop or click to select an image to upload [png, jpg]."]
-            ),
+            children=html.Div(["Drag and drop or click to select an image to upload"]),
             style={
                 "height": "60px",
                 "lineHeight": "60px",
@@ -78,28 +76,35 @@ app.layout = html.Div(
             id="image-dropdown",
             placeholder="Please choose the input image",
             value="None",
+            style={"text-align": "center"},
         ),
         dcc.Dropdown(
             id="class-dropdown",
             placeholder="Please choose the class to remove",
             value="None",
+            multi=True,
+            style={"text-align": "center"},
         ),
-        html.H3(f"Start inpainting"),
         html.Div(
             id="dynamic-button-container",
             children=[
                 html.Button(
                     id="start-inpainting",
                     children="Start inpainting",
-                    style={"display": "inline-block"},
+                    style={
+                        "display": "inline-block",
+                        "textalign": "center",
+                        "margin-left": "196px",
+                        "margin-top": "10px",
+                    },
                 )
             ],
-            style={"display": "inline-block"},
+            style={"display": "inline-block", "text-align": "center"},
         ),
-        html.H3(f"Original image"),
+        html.H3(f"Original image", style={"text-align": "center"}),
         html.Img(id="original-image", style={"display": "inline-block", "width": 500}),
-        html.H3(f"Inpainted image"),
-        html.Ul(id="results-download"),
+        html.H3(f"Inpainted image", style={"text-align": "center"}),
+        html.Ul(id="results-download", style={"text-align": "center"}),
         html.Img(id="inpainted-image", style={"display": "inline-block", "width": 500}),
     ],
     style={"max-width": "500px"},
@@ -186,13 +191,13 @@ def select_image(selected_image):
         State("class-dropdown", "value"),
     ],
 )
-def run_inpainting(nclicks, image_name, class_name):
+def run_inpainting(nclicks, image_name, class_names):
     input_image = cv2.imread(
         os.path.join(UPLOAD_DIRECTORY, image_name), cv2.IMREAD_COLOR
     )
 
     image_none_condition = image_name is None or image_name == "None"
-    class_none_condition = class_name is None or class_name == "None"
+    class_none_condition = class_names is None or class_names == "None"
 
     if image_none_condition or class_none_condition:
         return "", ""
@@ -201,12 +206,14 @@ def run_inpainting(nclicks, image_name, class_name):
 
     model_output = np.load(os.path.join(SEM_MASKS_DIRECTORY, filename + "_masks.npy"))
 
-    single_mask = segmentor.get_mask_sem(model_output, class_name)
+    single_mask = segmentor.get_mask_sem(model_output, class_names)
 
-    cv2.imwrite(f'{SEM_MASKS_DIRECTORY}/{image_name}_{class_name}.png', single_mask)
+    cv2.imwrite(
+        f"{SEM_MASKS_DIRECTORY}/{image_name}_{('_').join(class_names)}.png", single_mask
+    )
 
     inpainted_result = inpainter.inpaint(input_image, single_mask)
-    results_name = f"{filename}_{class_name}_removed{ext}"
+    results_name = f"{filename}_{('_').join(class_names)}_removed{ext}"
     cv2.imwrite(os.path.join(RESULTS_DIRECTORY, results_name), inpainted_result)
 
     results_location = f"/results/{urlquote(results_name)}"
