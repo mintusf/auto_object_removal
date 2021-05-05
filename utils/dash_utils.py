@@ -46,6 +46,9 @@ def get_classes_from_json(image_filename, json_path):
     
     with open(json_path, 'r') as fp:
         loaded_dict = json.load(fp)
-        classes = loaded_dict[image_filename]
+        try:
+            classes = loaded_dict[image_filename]
+        except KeyError:
+            return []
 
     return classes
