@@ -16,10 +16,10 @@ class Segmentor:
         self.max_instances = self.config["max_instances"]
         self.semantic_segmentation_model_cfg = self.config["semantic_segmentation_cfg"]
 
-        self.background_class_threshold = self.config['background_class_threshold']
-        self.foreground_class_threshold = self.config['foreground_class_threshold']
-        self.mask_dilation_size = self.config['mask_dilation_size']
-        self.mask_opening_size = self.config['mask_opening_size']
+        self.background_class_threshold = self.config["background_class_threshold"]
+        self.foreground_class_threshold = self.config["foreground_class_threshold"]
+        self.mask_dilation_size = self.config["mask_dilation_size"]
+        self.mask_opening_size = self.config["mask_opening_size"]
 
         # Set device
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -76,7 +76,7 @@ class Segmentor:
 
     def _parse_class_idx(self) -> None:
         """Parses indices (channels) of corresponding classes in final prediction"""
-        
+
         # Parse for semantic segmentation
         self.semseg_class2channel_list = self.config["semseg_idx"][
             self.semantic_segmentation_model_cfg[1]
@@ -85,7 +85,8 @@ class Segmentor:
             [
                 (k, v)
                 for (k, v) in zip(
-                    self.semseg_class2channel_list, np.arange(0, len(self.semseg_class2channel_list))
+                    self.semseg_class2channel_list,
+                    np.arange(0, len(self.semseg_class2channel_list)),
                 )
             ]
         )
@@ -94,17 +95,24 @@ class Segmentor:
             [
                 (v, k)
                 for (k, v) in zip(
-                    self.semseg_class2channel_list, np.arange(0, len(self.semseg_class2channel_list))
+                    self.semseg_class2channel_list,
+                    np.arange(0, len(self.semseg_class2channel_list)),
                 )
             ]
         )
 
     def get_available_masks(self, mask: np.array) -> list:
-        assert mask.max() <= len(self.semseg_class2channel_list), "Shape of mask does not match selected model"
+        assert mask.max() <= len(
+            self.semseg_class2channel_list
+        ), "Shape of mask does not match selected model"
 
         available_channels = np.unique(mask)
 
-        available_classes = [self.semseg_class2channel_list[channel] for channel in available_channels if channel != 0]
+        available_classes = [
+            self.semseg_class2channel_list[channel]
+            for channel in available_channels
+            if channel != 0
+        ]
 
         return available_classes
 
@@ -130,36 +138,49 @@ class Segmentor:
         return input_image.unsqueeze(0)
 
     def _mask2class(self, mask: torch.Tensor) -> np.array:
+        """ Postprocess semantic model's output to assign class to each pixel
+
+        Args:
+            mask (torch.Tensor): Semantic segmentation model's output
+
+        Returns:
+            np.array: Array with a semantic class assigned to each pixel
+        """
 
         mask = mask.cpu().numpy()
 
         # Get background channel
-        background_channel = self.semseg_class2channel_dict['background']
-        background_mask_orig = mask[background_channel,:,:].copy()
+        background_channel = self.semseg_class2channel_dict["background"]
 
         # Apply softmax
         mask_exp = np.exp(mask)
         mask_normalized = mask_exp / mask_exp.sum(0)
-        
+
         # Calculate where background is higher than threshold (softmax is used)
-        low_background_confidence = mask_normalized[background_channel,:,:] < self.background_class_threshold
+        low_background_confidence = (
+            mask_normalized[background_channel, :, :] < self.background_class_threshold
+        )
 
         # Calculate where any foreground class is higher than threshols
         foreground_classes_only = np.delete(mask_normalized, background_channel, 0)
-        high_foreground_confidence = np.any(foreground_classes_only > self.foreground_class_threshold, axis=0)
+        high_foreground_confidence = np.any(
+            foreground_classes_only > self.foreground_class_threshold, axis=0
+        )
 
         # Find class with highest probability (excluding background)
         mask_min = mask.min()
-        mask[background_channel,:,:] = mask_min
+        mask[background_channel, :, :] = mask_min
         output_predictions = mask.argmax(0)
 
         # Set final class
-        output_predictions = np.where(low_background_confidence & high_foreground_confidence, output_predictions, background_channel)
+        output_predictions = np.where(
+            low_background_confidence & high_foreground_confidence,
+            output_predictions,
+            background_channel,
+        )
 
         return output_predictions
 
-
-    
     def predict_mask(self, input_image: np.array) -> np.array:
         """Performs inference on the image
 
@@ -175,12 +196,12 @@ class Segmentor:
         # Generate a tensor which indicates pixel-wise class
         with torch.no_grad():
             output = self.semseg_model(input_image)["out"][0]
-        
+
         output_predictions = self._mask2class(output)
 
         return output_predictions
 
-    def get_mask_sem(self, output_predictions: np.array, class_name: str, save_path='') -> np.array:
+    def get_mask_sem(self, output_predictions: np.array, class_name: str) -> np.array:
         """Using model's predictions, extract mask for a desired class
 
         Args:
@@ -200,12 +221,16 @@ class Segmentor:
         class_mask = np.where(output_predictions == class_idx, 255, 0).astype(np.uint8)
 
         # Opening
-        opening_kernel = np.ones((self.mask_opening_size,self.mask_opening_size),np.uint8)
-        class_mask = cv2.dilate(class_mask,opening_kernel)
-        class_mask = cv2.erode(class_mask,opening_kernel)
+        opening_kernel = np.ones(
+            (self.mask_opening_size, self.mask_opening_size), np.uint8
+        )
+        class_mask = cv2.dilate(class_mask, opening_kernel)
+        class_mask = cv2.erode(class_mask, opening_kernel)
 
         # Dilation
-        dilation_kernel = np.ones((self.mask_dilation_size,self.mask_dilation_size),np.uint8)
-        class_mask = cv2.dilate(class_mask,dilation_kernel)
+        dilation_kernel = np.ones(
+            (self.mask_dilation_size, self.mask_dilation_size), np.uint8
+        )
+        class_mask = cv2.dilate(class_mask, dilation_kernel)
 
         return class_mask
