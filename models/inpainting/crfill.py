@@ -48,9 +48,14 @@ class CRFillModel(AbstractInpaintClass):
         # Change vcolor format
         img = img_orig[:, :, ::-1].copy()
 
+        # Change resolution to multiplication of 8 (requirement for crfill)
+        new_h, new_w = img.shape[0] // 8 * 8, img.shape[1] // 8 * 8
+        img = cv2.resize(img, (new_w, new_h))
+        mask = cv2.resize(mask_orig, (new_w, new_h))
+
         # COnvert to torch.tensor
         img = transforms.ToTensor()(img).unsqueeze(0)
-        mask = transforms.ToTensor()(mask_orig).unsqueeze(0)
+        mask = transforms.ToTensor()(mask).unsqueeze(0)
 
         # Normalize
         img = (img - 0.5) / 0.5
