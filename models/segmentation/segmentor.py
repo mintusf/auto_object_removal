@@ -1,3 +1,4 @@
+from typing import Tuple
 import torch
 import torchvision
 from torchvision import transforms
@@ -73,17 +74,35 @@ class Segmentor:
         """Parses indices (channels) of corresponding classes in final prediction"""
         
         # Parse for semantic segmentation
-        self.semseg_class_list = self.config["semseg_idx"][
+        self.semseg_class2channel_list = self.config["semseg_idx"][
             self.semantic_segmentation_model_cfg[1]
         ]
-        self.semseg_class_dict = dict(
+        self.semseg_class2channel_dict = dict(
             [
                 (k, v)
                 for (k, v) in zip(
-                    self.semseg_class_list, np.arange(0, len(self.semseg_class_list))
+                    self.semseg_class2channel_list, np.arange(0, len(self.semseg_class2channel_list))
                 )
             ]
         )
+
+        self.semseg_channel2class_dict = dict(
+            [
+                (v, k)
+                for (k, v) in zip(
+                    self.semseg_class2channel_list, np.arange(0, len(self.semseg_class2channel_list))
+                )
+            ]
+        )
+
+    def get_available_masks(self, mask: np.array) -> list:
+        assert mask.max() <= len(self.semseg_class2channel_list), "Shape of mask does not match selected model"
+
+        available_channels = np.unique(mask)
+
+        available_classes = [self.semseg_class2channel_list[channel] for channel in available_channels if channel != 0]
+
+        return available_classes
 
     def _preprocess(self, input_image: np.array) -> torch.tensor:
         """Performs preprocessing of input image
@@ -137,11 +156,11 @@ class Segmentor:
         """
 
         # class name check
-        if class_name not in self.semseg_class_list:
+        if class_name not in self.semseg_class2channel_list:
             raise ValueError(f"Class name {class_name} is not supported")
 
         # Get mask of desired class
-        class_idx = self.semseg_class_dict[class_name]
+        class_idx = self.semseg_class2channel_dict[class_name]
         class_mask = np.where(output_predictions == class_idx, 255, 0)
 
         dilation_kernel = np.ones((self.mask_dilation_size,self.mask_dilation_size),np.uint8)
