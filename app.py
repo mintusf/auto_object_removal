@@ -7,6 +7,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, State, Output
+from urllib.parse import quote as urlquote
 
 from utils.dash_utils import (
     save_file,
@@ -73,7 +74,6 @@ app.layout = html.Div(
             },
             multiple=True,
         ),
-        html.Ul(id="image-file-list"),
         dcc.Dropdown(
             id="image-dropdown",
             placeholder="Please choose the input image",
@@ -99,6 +99,7 @@ app.layout = html.Div(
         html.H3(f"Original image"),
         html.Img(id="original-image", style={"display": "inline-block", "width": 500}),
         html.H3(f"Inpainted image"),
+        html.Ul(id="results-download"),
         html.Img(id="inpainted-image", style={"display": "inline-block", "width": 500}),
     ],
     style={"max-width": "500px"},
@@ -178,7 +179,7 @@ def select_image(selected_image):
 
 
 @app.callback(
-    [Output("inpainted-image", "src")],
+    [Output("inpainted-image", "src"), Output("results-download", "children")],
     [
         Input("start-inpainting", "n_clicks"),
         State("image-dropdown", "value"),
@@ -194,7 +195,7 @@ def run_inpainting(nclicks, image_name, class_name):
     class_none_condition = class_name is None or class_name == "None"
 
     if image_none_condition or class_none_condition:
-        return [""]
+        return "", ""
 
     filename, ext = os.path.splitext(image_name)
 
@@ -207,7 +208,10 @@ def run_inpainting(nclicks, image_name, class_name):
     results_name = f"{filename}_{class_name}_removed{ext}"
     cv2.imwrite(os.path.join(RESULTS_DIRECTORY, results_name), inpainted_result)
 
-    return [os.path.join("results", results_name)]
+    results_location = f"/results/{urlquote(results_name)}"
+    return os.path.join("results", results_name), html.A(
+        "Download results", href=results_location
+    )
 
 
 if __name__ == "__main__":
