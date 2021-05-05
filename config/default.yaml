@@ -1,7 +1,10 @@
 input_type: "image"
 semantic_segmentation_cfg: ["resnet50", "deeplab"]
 max_instances: 50
-mask_dilation_size: 10
+mask_opening_size: 20 # Morphology to remove False Negatives
+mask_dilation_size: 10 # Morphology to expand mask
+background_class_threshold: 0.66 # Threshold for backgroudn detection
+foreground_class_threshold: 0.33 # Threshold for foreground detection
 
 # class indexes
 semseg_idx:

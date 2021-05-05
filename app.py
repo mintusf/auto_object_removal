@@ -203,8 +203,9 @@ def run_inpainting(nclicks, image_name, class_name):
 
     single_mask = segmentor.get_mask_sem(model_output, class_name)
 
-    inpainted_result = inpainter.inpaint(input_image, single_mask)
+    cv2.imwrite(f'{SEM_MASKS_DIRECTORY}/{image_name}_{class_name}.png', single_mask)
 
+    inpainted_result = inpainter.inpaint(input_image, single_mask)
     results_name = f"{filename}_{class_name}_removed{ext}"
     cv2.imwrite(os.path.join(RESULTS_DIRECTORY, results_name), inpainted_result)
 
