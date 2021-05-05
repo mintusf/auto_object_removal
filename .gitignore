@@ -32,3 +32,11 @@ __pypackages__/
 
 # Weights
 *.pth
+
+# Images
+*.png
+*.jpg
+!samples/images/*
+
+# App files
+app_files
