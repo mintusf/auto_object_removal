@@ -5,6 +5,7 @@ mask_opening_size: 20 # Morphology to remove False Negatives
 mask_dilation_size: 10 # Morphology to expand mask
 background_class_threshold: 0.66 # Threshold for backgroudn detection
 foreground_class_threshold: 0.33 # Threshold for foreground detection
+instance_confidence_threshold: 0.2
 
 # class indexes
 semseg_idx:
