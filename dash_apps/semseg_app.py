@@ -222,4 +222,4 @@ def attach_semseg_app(server):
             "Download results", href=results_location
         )
 
-    return server
+    return app

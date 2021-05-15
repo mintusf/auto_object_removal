@@ -1,6 +1,7 @@
 import argparse
 from flask import Flask
 from dash_apps.semseg_app import attach_semseg_app
+from dash_apps.instseg_app import attach_instseg_app
 
 def parser():
     parser = argparse.ArgumentParser()
@@ -20,8 +21,10 @@ if __name__ == "__main__":
     runmode = args.mode
     if runmode == 'semseg_img':
         attach_app = attach_semseg_app
+    if runmode == 'instseg_img':
+        attach_app = attach_instseg_app
 
     server = Flask(__name__)
-    server = attach_app(server)
+    app = attach_app(server)
 
-    server.run(debug=True, port=8888)
+    app.run_server(debug=True, port=8888)
