@@ -102,10 +102,10 @@ class AbstractInstanceSegmentation(metaclass=abc.ABCMeta):
 
         used_idx = []
         for label in selected_labels:
-            label_first_idx = np.where(np.array(available_labels) == np.array(label))[
-                0
-            ][0]
-            used_idx.append(label_first_idx)
+            label_idxs = np.where(np.array(available_labels) == np.array(label))[0]
+            if not len(label_idxs):
+                return None
+            used_idx.append(label_idxs[0])
 
         used_masks = available_masks[used_idx]
         mask = np.apply_along_axis(lambda arr: arr.any(), 0, used_masks).astype(
