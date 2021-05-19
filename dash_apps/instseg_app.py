@@ -1,23 +1,22 @@
 import os
-import shutil
 import cv2
+from shutil import rmtree
+from time import time
 import numpy as np
-import time
-from flask import Flask, send_from_directory
-import dash
+from flask import send_from_directory
+from dash import Dash, callback_context
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_leaflet as dl
 from dash.dependencies import Input, State, Output
 from urllib.parse import quote as urlquote
 
-import plotly.express as px
-
 from utils.dash_utils import (
     save_file,
     uploaded_files,
-    update_dict_json,
-    get_classes_from_json,
+    update_mask,
+    get_img_coordinates,
+    get_bounds,
 )
 from models.segmentation.instseg_maskrcnn import InstSegMaskRcnn
 from models.inpainting import CRFillModel
@@ -27,10 +26,10 @@ UPLOAD_DIRECTORY = "app_files/upload"
 SEM_MASKS_DIRECTORY = "app_files/sem_masks"
 RESULTS_DIRECTORY = "app_files/results"
 MISC_DIRECTORY = "app_files/misc"
-# for path in [UPLOAD_DIRECTORY, RESULTS_DIRECTORY, SEM_MASKS_DIRECTORY, MISC_DIRECTORY]:
-#     if os.path.exists(path):
-#         shutil.rmtree(path)
-#     os.makedirs(path)
+for path in [UPLOAD_DIRECTORY, RESULTS_DIRECTORY, SEM_MASKS_DIRECTORY, MISC_DIRECTORY]:
+    if os.path.exists(path):
+        rmtree(path)
+    os.makedirs(path)
 
 config_path = os.path.join("config", "default.yaml")
 segmentor = InstSegMaskRcnn(config_path)
@@ -39,7 +38,7 @@ inpainter = CRFillModel(config_path)
 
 def attach_instseg_app(server):
 
-    app = dash.Dash(server=server)
+    app = Dash(server=server)
 
     @server.route("/results/<path:path>")
     def download_results(path):
@@ -143,6 +142,14 @@ def attach_instseg_app(server):
             html.Img(
                 id="inpainted-image", style={"display": "inline-block", "width": 500}
             ),
+            dcc.ConfirmDialog(
+                id='mask_warning',
+                message='',
+                ),
+            dcc.ConfirmDialog(
+                id='mask_warning1',
+                message='',
+                ),
         ],
         style={"max-width": "500px"},
     )
@@ -153,6 +160,7 @@ def attach_instseg_app(server):
         prevent_initial_call=True,
     )
     def map_click(click_lat_lng):
+        """ Supports interactive clicking on the image """
         return [
             dl.Marker(
                 position=click_lat_lng,
@@ -192,8 +200,9 @@ def attach_instseg_app(server):
         prevent_initial_call=True,
     )
     def generate_masks(chosen_image):
+        """ Generate masks, if not generated yet, when image is selected """
 
-        img_name, ext = os.path.splitext(chosen_image)
+        img_name, _ = os.path.splitext(chosen_image)
         img = cv2.imread(os.path.join(UPLOAD_DIRECTORY, chosen_image))
 
         masks_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_masks.npy")
@@ -203,78 +212,15 @@ def attach_instseg_app(server):
             np.save(masks_path, masks)
             np.save(labels_path, labels)
 
-        # Visualize image
-        x, y, _ = img.shape
-        x_vis = 100
-        y_vis = 0.85 * x_vis * y / x
-        bounds = [[x_vis / 2, y_vis / 2], [-x_vis / 2, -y_vis / 2]]
-
         return [0]
-
-    def get_bounds(img):
-        # Visualize image
-        x, y, _ = img.shape
-        x_vis = 100
-        y_vis = 0.85 * x_vis * y / x
-        bounds = [[x_vis / 2, y_vis / 2], [-x_vis / 2, -y_vis / 2]]
-        return bounds
-
-    def get_img_coordinates(marker_position, image_bounds, img):
-        # Get x and y
-        marker_x_map, marker_y_map = marker_position
-
-        x_dim_map = image_bounds[0][0] - image_bounds[1][0]
-        y_dim_map = image_bounds[0][1] - image_bounds[1][1]
-        x_dim_img = img.shape[0]
-        y_dim_img = img.shape[1]
-
-        marker_y_img = int(
-            x_dim_img * ((image_bounds[0][0] - marker_x_map) / x_dim_map)
-        )
-        marker_x_img = int(
-            y_dim_img * ((marker_y_map - image_bounds[1][1]) / y_dim_map)
-        )
-
-        return marker_x_img, marker_y_img
-
-    def update_mask(orig_image_name, new_mask, action):
-        img_name, ext = os.path.splitext(orig_image_name)
-        orig_img = cv2.imread(os.path.join(UPLOAD_DIRECTORY, orig_image_name))
-        orig_img_shape = orig_img.shape
-        mask_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_mask.png")
-        if os.path.isfile(mask_path):
-            old_mask = np.expand_dims(cv2.imread(mask_path, 0), 2)
-        else:
-            old_mask = np.zeros((orig_img_shape[0], orig_img_shape[1], 1))
-            action = "None"
-
-        # Combine mask
-        if action in ["None", "add"]:
-            new_mask = np.logical_or(old_mask, new_mask).astype(np.uint8) * 255
-        elif action == "remove":
-            new_mask = (
-                np.logical_and(
-                    old_mask, np.logical_not(new_mask.astype(np.bool))
-                ).astype(np.uint8)
-                * 255
-            )
-
-        cv2.imwrite(mask_path, new_mask)
-
-        # Update masked_image
-        masked_img_path = os.path.join(
-            SEM_MASKS_DIRECTORY, f"{img_name}_masked_{int(time.time())}.png"
-        )
-        masked_img = np.where(new_mask, 0, orig_img)
-        cv2.imwrite(masked_img_path, masked_img)
-
-        return new_mask, os.path.split(masked_img_path)[-1]
 
     @app.callback(
         [
             Output("shown-image", "url"),
             Output("shown-image", "bounds"),
             Output("map", "bounds"),
+            Output("mask_warning","displayed"),
+            Output("mask_warning","message")
         ],
         [
             Input("image-dropdown", "value"),
@@ -294,36 +240,43 @@ def attach_instseg_app(server):
         selected_labels,
         current_bound,
     ):
-
         img_name, _ = os.path.splitext(orig_image)
         img = cv2.imread(os.path.join(UPLOAD_DIRECTORY, orig_image))
+        shown_img_path = os.path.join("/uploaded_images", orig_image)
+        bounds = get_bounds(img)
+
+        masks_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_masks.npy")
+        labels_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_labels.npy")
 
         if selected_labels and selected_labels != "None":
             x, y = get_img_coordinates(marker_position, current_bound, img)
-            masks_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_masks.npy")
-            labels_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_labels.npy")
-            masks = np.load(masks_path)
-            labels = np.load(labels_path)
-            new_mask = segmentor.get_mask(masks, labels, selected_labels, x, y)
 
-            ctx = dash.callback_context.triggered
+            ctx = callback_context.triggered
             if ctx[0]["prop_id"] == "add_mask.n_clicks":
                 action = "add"
             elif ctx[0]["prop_id"] == "remove_mask.n_clicks":
                 action = "remove"
+            else:
+                return shown_img_path, bounds, bounds, False, ""
 
-            _, masked_img_name = update_mask(orig_image, new_mask, action)
+            if not os.path.isfile(masks_path) or not os.path.isfile(labels_path):
+                return shown_img_path, bounds, bounds, True, "Please wait until masks are generated"
+            masks = np.load(masks_path)
+            labels = np.load(labels_path)
+            new_mask = segmentor.get_mask(masks, labels, selected_labels, x, y)
+
+            if new_mask is None:
+                return shown_img_path, bounds, bounds, True, "It seems that this label doesn't exist on the image"
+
+            _, masked_img_name = update_mask(orig_image, new_mask, action, UPLOAD_DIRECTORY, SEM_MASKS_DIRECTORY)
 
             shown_img_path = os.path.join("/masks", masked_img_name)
-        else:
-            shown_img_path = os.path.join("/uploaded_images", orig_image)
 
-        bounds = get_bounds(img)
-
-        return shown_img_path, bounds, bounds
+        return shown_img_path, bounds, bounds, False, ""
 
     @app.callback(
-        [Output("class-dropdown", "options"), Output("class-dropdown", "value")],
+        [Output("class-dropdown", "options"), Output("class-dropdown", "value"),            Output("mask_warning1","displayed"),
+            Output("mask_warning1","message")],
         [
             Input("marker", "position"),
             State("image-dropdown", "value"),
@@ -338,6 +291,9 @@ def attach_instseg_app(server):
 
         masks_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_masks.npy")
         labels_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_labels.npy")
+
+        if not os.path.isfile(masks_path) or not os.path.isfile(labels_path):
+            return [], [], True, "Slow down, masks are not generated yet"
         masks = np.load(masks_path)
         labels = np.load(labels_path)
 
@@ -354,7 +310,7 @@ def attach_instseg_app(server):
             for class_name in available_classes
         ]
 
-        return drop_list, available_classes
+        return drop_list, available_classes, False, ""
 
     @app.callback(
         [Output("inpainted-image", "src"), Output("results-download", "children")],
@@ -381,7 +337,7 @@ def attach_instseg_app(server):
 
         inpainted_result = inpainter.inpaint(input_image, mask)
 
-        results_name = f"{filename}_removed_{int(time.time())}.png"
+        results_name = f"{filename}_removed_{int(time())}.png"
         cv2.imwrite(os.path.join(RESULTS_DIRECTORY, results_name), inpainted_result)
 
         results_location = f"/results/{urlquote(results_name)}"
