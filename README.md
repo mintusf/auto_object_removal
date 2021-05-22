@@ -5,7 +5,7 @@ An application to automatically remove selected objects from images.
 It combines image segmentation with image inpainting to create automated pipeline to remove whole objects.
 There are two removal modes:
 * all instance removal (semantic segmentation is used)
-* single instance removal (instance segmentation is used) (NOT YET IMPLEMENTED)
+* single instance removal (instance segmentation is used)
 
 Implemented segmentation models:
 * Deeplab (torchvision weigths used)
