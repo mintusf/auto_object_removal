@@ -18,7 +18,7 @@ def test_segmentor():
 
     assert segmentor.get_mask(masks, labels, ["troll"], 419, 468) is None
 
-    combined_mask = segmentor.get_mask(masks, labels, ["backpack"], 419, 468)
+    combined_mask = segmentor.get_mask(masks, labels, available_labels, 419, 468)
     cv2.imwrite(f"combined_mask.png", np.where(combined_mask, 0, input_image))
 
     for i in range(masks.shape[0]):
