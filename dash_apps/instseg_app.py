@@ -1,6 +1,6 @@
 import os
 import cv2
-from shutil import rmtree
+from shutil import rmtree, copyfile
 from time import time
 import numpy as np
 from flask import send_from_directory
@@ -30,6 +30,8 @@ for path in [UPLOAD_DIRECTORY, RESULTS_DIRECTORY, SEM_MASKS_DIRECTORY, MISC_DIRE
     if os.path.exists(path):
         rmtree(path)
     os.makedirs(path)
+
+copyfile('samples/images/white_blank.png','app_files/sem_masks/white_blank.png')
 
 config_path = os.path.join("config", "default.yaml")
 segmentor = InstSegMaskRcnn(config_path)
@@ -65,7 +67,7 @@ def attach_instseg_app(server):
         return img
 
     image_bounds = [[40.712216, -74.22655], [40.773941, -74.12544]]
-    image_url = "/uploaded_images/human_multi.jpg"
+    image_url = "/masks/white_blank.png"
 
     app.layout = html.Div(
         [
@@ -229,6 +231,7 @@ def attach_instseg_app(server):
             State("marker", "position"),
             State("class-dropdown", "value"),
             State("shown-image", "bounds"),
+            State("map", "bounds"),
         ],
         prevent_initial_call=True,
     )
@@ -239,11 +242,13 @@ def attach_instseg_app(server):
         marker_position,
         selected_labels,
         current_bound,
+        current_shown_bound,
     ):
         img_name, _ = os.path.splitext(orig_image)
         img = cv2.imread(os.path.join(UPLOAD_DIRECTORY, orig_image))
         shown_img_path = os.path.join("/uploaded_images", orig_image)
         bounds = get_bounds(img)
+        shown_bounds = bounds
 
         masks_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_masks.npy")
         labels_path = os.path.join(SEM_MASKS_DIRECTORY, f"{img_name}_labels.npy")
@@ -271,8 +276,9 @@ def attach_instseg_app(server):
             _, masked_img_name = update_mask(orig_image, new_mask, action, UPLOAD_DIRECTORY, SEM_MASKS_DIRECTORY)
 
             shown_img_path = os.path.join("/masks", masked_img_name)
+            shown_bounds = current_shown_bound
 
-        return shown_img_path, bounds, bounds, False, ""
+        return shown_img_path, bounds, shown_bounds, False, ""
 
     @app.callback(
         [Output("class-dropdown", "options"), Output("class-dropdown", "value"),            Output("mask_warning1","displayed"),
