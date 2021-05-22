@@ -36,7 +36,7 @@ Examples:
 | ![](samples/GUI/sem_seg_GUI.PNG)      | ![](samples/GUI/sem_seg_GUI.gif)       |
 
 
-   2. Semantic segmentation (all instances of selected classes are removed)
+   2. Instance segmentation (only selected instances are removed)
 
 ```bash
 python app.py --mode instseg_img
