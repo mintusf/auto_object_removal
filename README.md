@@ -24,9 +24,25 @@ pipenv shell
 ```
 
 2. Run the program
-   1. Dash GUI
-Dash GUI is implemented in the repository:
+   1. Semantic segmentation (all instances of selected classes are removed)
+
+```bash
+python app.py --mode semseg_img
+```
+Examples:
 
 |  Image  | Video |
 | ----------- | ----------- |
-| ![](samples/GUI/GUI_1.PNG)      | ![](samples/GUI/GUI_gif.gif)       |
+| ![](samples/GUI/sem_seg_GUI.PNG)      | ![](samples/GUI/sem_seg_GUI.gif)       |
+
+
+   2. Semantic segmentation (all instances of selected classes are removed)
+
+```bash
+python app.py --mode instseg_img
+```
+Examples:
+
+|  Image  | Video |
+| ----------- | ----------- |
+| ![](samples/GUI/inst_seg_GUI.PNG)      | ![](samples/GUI/inst_seg_GUI.gif)       |
